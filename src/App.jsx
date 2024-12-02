@@ -1,11 +1,26 @@
 import './App.css';
 import { useState, useRef, useEffect } from 'react';
-import { ElevenLabsClient } from "elevenlabs";
+import { ElevenLabsClient, stream } from "elevenlabs";
+
+async function streamToBlob(readableStream, mimeType = "application/octet-stream") {
+  const chunks = [];
+  const reader = readableStream.reader;
+
+  let done = false;
+  while (!done) {
+    const { value, done: streamDone } = await reader.read();
+    if (value) {
+      chunks.push(value);
+    }
+    done = streamDone;
+  }
+
+  return new Blob(chunks, { type: mimeType });
+}
 
 function App() {
-  const audioRef = useRef(null);
   const [audioCtx, setAudioCtx] = useState(null); // Store audio context
-  const [client, setClient] = useState(null)
+  const client = new ElevenLabsClient({ apiKey: "sk_b5375332781790159087d760375a399081c2b8a273d4d586" });
   const [recording, setRecording] = useState(false);
   const [audioURL, setAudioURL] = useState('');
   const [generatedAudioStream, setGeneratedAudioStream] = useState(null);
@@ -15,9 +30,7 @@ function App() {
   let vibrationInterval;
 
   useEffect(() => {
-    // Initialize ElevenLabs Client (replace with your actual API key)
-    const client = new ElevenLabsClient({ apiKey: "sk_492560d0e8fe33a5f48faed524a418bdd4cdabd8b82de926" });
-    setClient(client)
+    // setClient(client)
     setAudioCtx(new (window.AudioContext || window.webkitAudioContext)());
 
     return () => {
@@ -33,6 +46,27 @@ function App() {
     }
   }, [recording]);
 
+  const sendAudio11Labs = async (chunks) => {
+    const blob = new Blob(chunks.current, { type: 'audio/ogg; codecs=opus' });
+        chunks.current = [];
+
+        try {
+          const outputStream = await client.speechToSpeech.convert("9BWtsMINqrJLrRacOk9x", { // Replace with your Voice ID
+            audio: blob, // Blob is enough
+            enable_logging: 1,
+            optimize_streaming_latency: 0,
+            output_format: "mp3_22050_32"
+          });
+
+          const outputBlob = await streamToBlob(outputStream)
+
+          const url = URL.createObjectURL(outputBlob);
+          setAudioURL(url);
+        } catch (error) {
+          console.error("ElevenLabs Error:", error);
+        }
+  }
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -40,29 +74,16 @@ function App() {
 
       mediaRecorder.current.ondataavailable = (e) => {
         chunks.current.push(e.data);
+        const intervalId = setInterval(async () => {
+          if (chunks.current.length > 0) {
+            // const chunk = chunks.current.shift();
+            await sendAudio11Labs(chunks);
+          } else {
+            clearInterval(intervalId);
+          }
+        }, 3000); // 3 seconds interval
       };
 
-      mediaRecorder.current.onstop = async () => {
-        const blob = new Blob(chunks.current, { type: 'audio/ogg; codecs=opus' });
-        chunks.current = [];
-        const url = URL.createObjectURL(blob);
-        setAudioURL(url);
-
-        try {
-          const audioArrayBuffer = await blob.arrayBuffer();
-
-          const stream = await client.speechToSpeech.convertAsStream("9BWtsMINqrJLrRacOk9x", { // Replace with your Voice ID
-            audio: audioArrayBuffer,
-            enable_logging: 1,
-            optimize_streaming_latency: 0,
-            output_format: "mp3_22050_32"
-          });
-          setGeneratedAudioStream(stream)
-
-        } catch (error) {
-          console.error("ElevenLabs Error:", error);
-        }
-      };
       mediaRecorder.current.start();
       setRecording(true);
     } catch (err) {
@@ -137,7 +158,11 @@ function App() {
           {recording ? 'Stop Recording' : 'Start Recording'}
         </button>
         {audioURL && (
-          <audio controls src={audioURL} />
+          <audio
+            controls
+            autoPlay
+            src={audioURL}
+          />
         )}
         <div ref={visualIndicator} style={{ width: '50px', height: '50px', backgroundColor: 'red', borderRadius: '50%', display: recording ? 'block' : 'none'}} />
       </header>
