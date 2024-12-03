@@ -21,7 +21,7 @@ async function streamToBlob(readableStream, mimeType = "application/octet-stream
 
 function App() {
   const [audioCtx, setAudioCtx] = useState(null); // Store audio context
-  const client = new ElevenLabsClient({ apiKey: "sk_b5375332781790159087d760375a399081c2b8a273d4d586" });
+  const client = new ElevenLabsClient({ apiKey: import.meta.env.VITE_ELEVENLABS_API_KEY });
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [recording, setRecording] = useState(false);
   const [audioURL, setAudioURL] = useState('');
