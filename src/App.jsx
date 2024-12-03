@@ -1,6 +1,7 @@
 import './App.css';
 import { useState, useRef, useEffect } from 'react';
 import { ElevenLabsClient, stream } from "elevenlabs";
+import VoiceDropdown from './Components/VoiceDropdown';
 
 async function streamToBlob(readableStream, mimeType = "application/octet-stream") {
   const chunks = [];
@@ -21,6 +22,7 @@ async function streamToBlob(readableStream, mimeType = "application/octet-stream
 function App() {
   const [audioCtx, setAudioCtx] = useState(null); // Store audio context
   const client = new ElevenLabsClient({ apiKey: "sk_b5375332781790159087d760375a399081c2b8a273d4d586" });
+  const [selectedVoice, setSelectedVoice] = useState(null);
   const [recording, setRecording] = useState(false);
   const [audioURL, setAudioURL] = useState('');
   const [generatedAudioStream, setGeneratedAudioStream] = useState(null);
@@ -46,12 +48,16 @@ function App() {
     }
   }, [recording]);
 
-  const sendAudio11Labs = async (chunks) => {
+  const handleVoiceSelect = (voice) => {
+    setSelectedVoice(voice);
+  };
+
+  const sendAudio11Labs = async (chunks, voice_id) => {
     const blob = new Blob(chunks.current, { type: 'audio/ogg; codecs=opus' });
         chunks.current = [];
 
         try {
-          const outputStream = await client.speechToSpeech.convert("9BWtsMINqrJLrRacOk9x", { // Replace with your Voice ID
+          const outputStream = await client.speechToSpeech.convert(voice_id, { // Replace with your Voice ID
             audio: blob, // Blob is enough
             enable_logging: 1,
             optimize_streaming_latency: 0,
@@ -77,7 +83,7 @@ function App() {
         const intervalId = setInterval(async () => {
           if (chunks.current.length > 0) {
             // const chunk = chunks.current.shift();
-            await sendAudio11Labs(chunks);
+            await sendAudio11Labs(chunks, selectedVoice.voice_id);
           } else {
             clearInterval(intervalId);
           }
@@ -153,6 +159,15 @@ function App() {
     <div className="App">
       <header className="App-header">
         <img src="Octocat.png" className="App-logo" alt="logo" />
+        <p>Select Voices</p>
+        <VoiceDropdown client={client} onVoiceSelect={handleVoiceSelect}></VoiceDropdown>
+        {/* Display selected voice details (optional) */}
+        {selectedVoice && (
+          <div>
+            <p>Selected Voice: {selectedVoice.name}</p>
+            {/* ... other voice details you might want to display */}
+          </div>
+        )}
         <p>Record and Playback Audio</p>
         <button onClick={recording ? stopRecording : startRecording}>
           {recording ? 'Stop Recording' : 'Start Recording'}
