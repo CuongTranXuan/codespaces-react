@@ -25,7 +25,7 @@ const VoiceDropdown = ({ client, onVoiceSelect }) => {
     };
 
     fetchVoices();
-  }, [client]); // Run effect whenever the client changes
+  }, []); // Run effect whenever the client changes
 
 
   const handleChange = (event) => {
