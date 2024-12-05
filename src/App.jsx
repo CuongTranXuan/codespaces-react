@@ -16,6 +16,7 @@ function App() {
     const chunks = useRef([]);
     const visualIndicator = useRef(null);
     let vibrationInterval;
+    let audioInterval;
 
     useEffect(() => {
         // setClient(client)
@@ -115,37 +116,38 @@ function App() {
         }
     };
 
+    function recordInterval(stream) {
+        console.log(
+            "recording"
+        )
+        mediaRecorder.current = new MediaRecorder(stream);
+
+        mediaRecorder.current.ondataavailable = (e) => {
+            chunks.current.push(e.data);
+        };
+        mediaRecorder.current.onstop = (e) => {
+            sendAudio11Labs(chunks, selectedVoice.voice_id)
+        }
+
+        mediaRecorder.current.start();
+        setTimeout(() => mediaRecorder.current.stop(), 3000);
+    }
+
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: { latency: 0 } });
-            mediaRecorder.current = new MediaRecorder(stream);
-
-            mediaRecorder.current.ondataavailable = (e) => {
-                chunks.current.push(e.data);
-                const intervalId = setInterval(async () => {
-                    if (chunks.current.length > 0) {
-                        // const chunk = chunks.current.shift();
-                        console.log("sent audio and wait for return");
-                        await sendAudio11Labs(chunks, selectedVoice.voice_id);
-                    } else {
-                        clearInterval(intervalId);
-                    }
-                }, 3000); // 3 seconds interval
-            };
-
-            mediaRecorder.current.start();
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: { latency: 0 },
+            });
+            audioInterval = setInterval(recordInterval(stream), 3000);
             setRecording(true);
         } catch (err) {
             console.error("Error accessing microphone:", err);
         }
     };
 
-
     const stopRecording = () => {
-        if (mediaRecorder.current) {
-            mediaRecorder.current.stop();
-            setRecording(false);
-        }
+        clearInterval(audioInterval);
+        setRecording(false);
     };
 
     return (
